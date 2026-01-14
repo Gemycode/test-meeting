@@ -365,8 +365,15 @@
           remoteStream.getTracks().forEach(track => {
             console.log('📡 Remote track:', track.kind, 'enabled:', track.enabled, 'readyState:', track.readyState, 'muted:', track.muted);
             
-            // التأكد من أن track مفعل
+            // التأكد من أن track مفعل وغير muted
             track.enabled = true;
+            
+            // إذا كان track muted، نحاول unmute
+            if (track.muted) {
+              console.log('Unmuting remote track:', track.kind);
+              // Note: track.muted is read-only, but we can ensure it's enabled
+              track.enabled = true;
+            }
             
             track.onended = () => {
               console.log('⚠️ Remote track ended:', track.kind);
@@ -374,6 +381,8 @@
             
             track.onmute = () => {
               console.warn('⚠️ Remote track muted:', track.kind);
+              // محاولة إعادة تفعيل
+              track.enabled = true;
             };
             
             track.onunmute = () => {
@@ -423,15 +432,28 @@
         if (pc.connectionState === 'connected') {
           document.getElementById('loading').style.display = 'none';
           console.log('✅ WebRTC connection established!');
-        } else if (pc.connectionState === 'failed') {
-          console.error('❌ WebRTC connection failed');
-          document.getElementById('loading').textContent = 'فشل الاتصال. جاري إعادة المحاولة...';
+        } else if (pc.connectionState === 'failed' || pc.connectionState === 'disconnected') {
+          console.error('❌ WebRTC connection', pc.connectionState);
+          // محاولة إعادة الاتصال
+          if (pc.connectionState === 'failed') {
+            console.log('Attempting to restart ICE...');
+            pc.restartIce();
+          }
         }
       };
 
       // مراقبة ICE connection state
       pc.oniceconnectionstatechange = () => {
         console.log('ICE connection state:', pc.iceConnectionState);
+        if (pc.iceConnectionState === 'failed') {
+          console.log('ICE connection failed, restarting...');
+          pc.restartIce();
+        }
+      };
+
+      // مراقبة signaling state
+      pc.onsignalingstatechange = () => {
+        console.log('Signaling state:', pc.signalingState);
       };
 
       socket.on('joined', async (data) => {
@@ -497,55 +519,66 @@
           console.log('Received signal:', Object.keys(msg));
           
           if (msg.sdp) {
-            console.log('Received SDP:', msg.sdp.type);
+            console.log('Received SDP:', msg.sdp.type, 'Current state:', pc.signalingState);
             
             try {
-              // إضافة SDP description
-              await pc.setRemoteDescription(new RTCSessionDescription(msg.sdp));
-              console.log('Remote description set:', msg.sdp.type);
-              
-            if (msg.sdp.type === 'offer') {
-              // إذا استقبلنا offer، نكون answer
-              console.log('Creating answer...');
-              const answer = await pc.createAnswer({
-                offerToReceiveAudio: true,
-                offerToReceiveVideo: true
-              });
-              await pc.setLocalDescription(answer);
-              console.log('Sending answer');
-              socket.emit('signal', {
-                bookingId,
-                signal: JSON.stringify({ sdp: answer })
-              });
-              
-              // إضافة pending ICE candidates بعد setRemoteDescription
-              if (pc.pendingIceCandidates) {
-                console.log('Adding pending ICE candidates:', pc.pendingIceCandidates.length);
-                for (const candidate of pc.pendingIceCandidates) {
-                  try {
-                    await pc.addIceCandidate(candidate);
-                  } catch (e) {
-                    console.error('Error adding pending ICE candidate:', e);
+              if (msg.sdp.type === 'offer') {
+                // إذا استقبلنا offer، نكون answer
+                // التحقق من أننا لسنا في حالة have-remote-offer أو stable
+                if (pc.signalingState === 'stable' || pc.signalingState === 'have-local-offer') {
+                  console.log('Setting remote offer...');
+                  await pc.setRemoteDescription(new RTCSessionDescription(msg.sdp));
+                  console.log('Remote offer set, creating answer...');
+                  
+                  const answer = await pc.createAnswer({
+                    offerToReceiveAudio: true,
+                    offerToReceiveVideo: true
+                  });
+                  await pc.setLocalDescription(answer);
+                  console.log('Sending answer');
+                  socket.emit('signal', {
+                    bookingId,
+                    signal: JSON.stringify({ sdp: answer })
+                  });
+                  
+                  // إضافة pending ICE candidates بعد setRemoteDescription
+                  if (pc.pendingIceCandidates && pc.pendingIceCandidates.length > 0) {
+                    console.log('Adding pending ICE candidates:', pc.pendingIceCandidates.length);
+                    for (const candidate of pc.pendingIceCandidates) {
+                      try {
+                        await pc.addIceCandidate(candidate);
+                      } catch (e) {
+                        console.error('Error adding pending ICE candidate:', e);
+                      }
+                    }
+                    pc.pendingIceCandidates = [];
                   }
+                } else {
+                  console.warn('Cannot set remote offer, current state:', pc.signalingState);
                 }
-                pc.pendingIceCandidates = [];
-              }
-            } else if (msg.sdp.type === 'answer') {
-              console.log('Answer received and set');
-              
-              // إضافة pending ICE candidates بعد setRemoteDescription
-              if (pc.pendingIceCandidates) {
-                console.log('Adding pending ICE candidates:', pc.pendingIceCandidates.length);
-                for (const candidate of pc.pendingIceCandidates) {
-                  try {
-                    await pc.addIceCandidate(candidate);
-                  } catch (e) {
-                    console.error('Error adding pending ICE candidate:', e);
+              } else if (msg.sdp.type === 'answer') {
+                // إذا استقبلنا answer، نضيفه فقط إذا كنا في حالة have-local-offer
+                if (pc.signalingState === 'have-local-offer') {
+                  console.log('Setting remote answer...');
+                  await pc.setRemoteDescription(new RTCSessionDescription(msg.sdp));
+                  console.log('Remote answer set successfully');
+                  
+                  // إضافة pending ICE candidates بعد setRemoteDescription
+                  if (pc.pendingIceCandidates && pc.pendingIceCandidates.length > 0) {
+                    console.log('Adding pending ICE candidates:', pc.pendingIceCandidates.length);
+                    for (const candidate of pc.pendingIceCandidates) {
+                      try {
+                        await pc.addIceCandidate(candidate);
+                      } catch (e) {
+                        console.error('Error adding pending ICE candidate:', e);
+                      }
+                    }
+                    pc.pendingIceCandidates = [];
                   }
+                } else {
+                  console.warn('Cannot set remote answer, current state:', pc.signalingState, 'Expected: have-local-offer');
                 }
-                pc.pendingIceCandidates = [];
               }
-            }
             } catch (sdpError) {
               console.error('Error handling SDP:', sdpError);
             }
