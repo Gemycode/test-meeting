@@ -1,302 +1,58 @@
 <!DOCTYPE html>
-<html lang="en">
+<html lang="ar" dir="rtl">
 <head>
   <meta charset="UTF-8" />
-  <title>Video Meeting</title>
+  <title>Video Meeting - Fixed</title>
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-
   <style>
-    * {
-      margin: 0;
-      padding: 0;
-      box-sizing: border-box;
-      font-family: "Segoe UI", system-ui, -apple-system, BlinkMacSystemFont, sans-serif;
-    }
-
-    body {
-      background: #0e0f13;
-      color: #fff;
-      height: 100vh;
-      overflow: hidden;
-    }
-
-    .meeting-container {
-      position: relative;
-      width: 100%;
-      height: 100%;
-      background: #0e0f13;
-    }
-
-    /* Main remote video (speaker view) */
-    #remote {
-      width: 100%;
-      height: 100%;
-      object-fit: cover;
-      background: #000;
-    }
-
-    /* Local self view (picture-in-picture) */
-    #local {
-      position: absolute;
-      bottom: 90px;
-      right: 24px;
-      width: 220px;
-      height: 140px;
-      border-radius: 12px;
-      object-fit: cover;
-      background: #000;
-      border: 1px solid rgba(255,255,255,0.15);
-      box-shadow: 0 10px 30px rgba(0,0,0,0.6);
-    }
-
-    /* Top bar */
-    .top-bar {
-      position: absolute;
-      top: 0;
-      left: 0;
-      width: 100%;
-      height: 56px;
-      display: flex;
-      align-items: center;
-      padding: 0 20px;
-      background: linear-gradient(to bottom, rgba(0,0,0,0.6), transparent);
-      z-index: 10;
-    }
-
-    .meeting-title {
-      font-size: 14px;
-      font-weight: 500;
-      opacity: 0.85;
-    }
-
-    .user-badge {
-      margin-right: auto;
-      font-size: 12px;
-      opacity: 0.7;
-      padding: 4px 12px;
-      background: rgba(255,255,255,0.1);
-      border-radius: 12px;
-    }
-
- 
-    .controls {
-      position: absolute;
-      bottom: 0;
-      left: 0;
-      width: 100%;
-      height: 72px;
-      display: flex;
-      justify-content: center;
-      align-items: center;
-      gap: 14px;
-      background: linear-gradient(to top, rgba(0,0,0,0.75), transparent);
-      z-index: 10;
-    }
-
-    .control-btn {
-      width: 44px;
-      height: 44px;
-      border-radius: 50%;
-      background: rgba(255,255,255,0.1);
-      border: 1px solid rgba(255,255,255,0.15);
-      display: flex;
-      align-items: center;
-      justify-content: center;
-      cursor: default;
-    }
-
-    .control-btn.end {
-      background: #e53935;
-      border-color: #e53935;
-    }
-
-    .control-btn svg {
-      width: 20px;
-      height: 20px;
-      fill: #fff;
-    }
-
-    .loading {
-      position: absolute;
-      top: 50%;
-      left: 50%;
-      transform: translate(-50%, -50%);
-      color: #fff;
-      font-size: 18px;
-      z-index: 100;
-    }
-
-    .loading::after {
-      content: '...';
-      animation: dots 1.5s steps(4, end) infinite;
-    }
-
-    @keyframes dots {
-      0%, 20% { content: '.'; }
-      40% { content: '..'; }
-      60%, 100% { content: '...'; }
-    }
-
-    /* Responsive */
-    @media (max-width: 600px) {
-      #local {
-        width: 140px;
-        height: 100px;
-        bottom: 80px;
-        right: 12px;
-      }
-    }
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+    body { background: #0e0f13; color: #fff; height: 100vh; overflow: hidden; font-family: system-ui; }
+    .container { position: relative; width: 100%; height: 100%; }
+    #remote { width: 100%; height: 100%; object-fit: cover; background: #000; }
+    #local { position: absolute; bottom: 90px; right: 24px; width: 220px; height: 140px; 
+             border-radius: 12px; object-fit: cover; background: #000; 
+             border: 1px solid rgba(255,255,255,0.15); }
+    .status { position: absolute; top: 20px; left: 20px; padding: 10px 15px; 
+              background: rgba(0,0,0,0.7); border-radius: 8px; font-size: 14px; }
+    .controls { position: absolute; bottom: 20px; left: 50%; transform: translateX(-50%); 
+                display: flex; gap: 10px; }
+    button { padding: 10px 20px; background: #667eea; color: white; border: none; 
+             border-radius: 8px; cursor: pointer; font-size: 14px; }
+    button:hover { background: #5568d3; }
+    .end { background: #e53935; }
+    .end:hover { background: #d32f2f; }
   </style>
 </head>
-
 <body>
-  <div class="meeting-container">
-
-    <!-- Top bar -->
-    <div class="top-bar">
-      <div class="meeting-title">Secure Video Meeting</div>
-      <div class="user-badge" id="userBadge">Loading...</div>
-    </div>
-
-    <!-- Videos -->
-    <video id="remote" autoplay playsinline controls></video>
+  <div class="container">
+    <video id="remote" autoplay playsinline></video>
     <video id="local" autoplay muted playsinline></video>
-    
-    <!-- Loading indicator -->
-    <div class="loading" id="loading">جاري الاتصال</div>
-
-    <!-- Bottom controls (UI only) -->
+    <div class="status" id="status">Initializing...</div>
     <div class="controls">
-      <div class="control-btn">
-        <!-- Mic -->
-        <svg viewBox="0 0 24 24">
-          <path d="M12 14a3 3 0 003-3V5a3 3 0 00-6 0v6a3 3 0 003 3z"/>
-        </svg>
-      </div>
-
-      <div class="control-btn">
-        <!-- Camera -->
-        <svg viewBox="0 0 24 24">
-          <path d="M17 10.5V7a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2h10a2 2 0 002-2v-3.5l4 4v-11l-4 4z"/>
-        </svg>
-      </div>
-
-      <div class="control-btn end">
-        <!-- End call -->
-        <svg viewBox="0 0 24 24">
-          <path d="M3 10l3-3a15 15 0 0112 0l3 3-3 3-3-3a9 9 0 00-6 0l-3 3-3-3z"/>
-        </svg>
-      </div>
+      <button id="toggleAudio">Mute Audio</button>
+      <button id="toggleVideo">Stop Video</button>
+      <button class="end" id="endCall">End Call</button>
     </div>
   </div>
 
-  <!-- ❗ JS LOGIC -->
   <script src="https://cdn.socket.io/4.7.2/socket.io.min.js"></script>
   <script>
-  // جلب البيانات من localStorage
-  const token = localStorage.getItem('jwt_token');
-  const bookingId = localStorage.getItem('booking_id');
-
-  if (!token || !bookingId) {
-    alert('يرجى تسجيل الدخول أولاً');
-    window.location.href = 'index.html';
-  }
-
-  // Auto-detect API URL based on environment
-  const API_URL = window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1'
-    ? 'http://localhost:5000'
-    : 'https://infipeak-api.onrender.com';
-  
-  const socket = io(API_URL, {
-    auth: { token: token }
-  });
-
-  (async () => {
-    const localVideo = document.getElementById('local');
-    const remoteVideo = document.getElementById('remote');
-
-    let pc;
-    let isInitiator = false;
-    let isReady = false;
-
-    let stream = null;
+    // ========================
+    // Configuration
+    // ========================
+    const token = localStorage.getItem('jwt_token');
+    const bookingId = localStorage.getItem('booking_id');
     
-    try {
-      // محاولة 1: كاميرا + ميكروفون بجودة عالية
-      try {
-        stream = await navigator.mediaDevices.getUserMedia({
-          video: {
-            width: { ideal: 1280 },
-            height: { ideal: 720 },
-            facingMode: 'user'
-          },
-          audio: {
-            echoCancellation: true,
-            noiseSuppression: true
-          }
-        });
-        console.log('Successfully got video + audio');
-      } catch (error1) {
-        console.warn('Failed to get video+audio, trying video only:', error1);
-        
-        // محاولة 2: كاميرا فقط
-        try {
-          stream = await navigator.mediaDevices.getUserMedia({ video: true });
-          console.log('Successfully got video only');
-        } catch (error2) {
-          console.warn('Failed to get video, trying audio only:', error2);
-          
-          // محاولة 3: ميكروفون فقط
-          try {
-            stream = await navigator.mediaDevices.getUserMedia({ audio: true });
-            console.log('Successfully got audio only');
-            // إخفاء الفيديو المحلي إذا لم يكن هناك كاميرا
-            localVideo.style.display = 'none';
-          } catch (error3) {
-            console.warn('Failed to get audio, trying basic video:', error3);
-            
-            // محاولة 4: كاميرا بسيطة
-            try {
-              stream = await navigator.mediaDevices.getUserMedia({ 
-                video: { facingMode: 'user' } 
-              });
-              console.log('Successfully got basic video');
-            } catch (error4) {
-              // كل المحاولات فشلت
-              const errorMsg = getErrorMessage(error4);
-              throw new Error(errorMsg);
-            }
-          }
-        }
-      }
-      
-      if (stream) {
-        localVideo.srcObject = stream;
-        localVideo.muted = true; // mute الفيديو المحلي (عادة)
-        
-        // التأكد من أن جميع tracks مفعلة
-        stream.getTracks().forEach(track => {
-          console.log('Local track:', track.kind, track.enabled, track.readyState);
-          track.enabled = true;
-        });
-        
-        // إذا لم يكن هناك video track، أخفي الفيديو المحلي
-        const videoTracks = stream.getVideoTracks();
-        if (videoTracks.length === 0) {
-          localVideo.style.display = 'none';
-          console.log('No video track, hiding local video');
-        }
-        
-        // تشغيل الفيديو المحلي
-        localVideo.play().catch(err => {
-          console.error('Error playing local video:', err);
-        });
-      } else {
-        throw new Error('فشل الوصول إلى الكاميرا/الميكروفون');
-      }
+    if (!token || !bookingId) {
+      alert('Login required');
+      window.location.href = 'index.html';
+    }
 
-      // إعدادات WebRTC محسنة مع Metered.ca TURN
-      pc = new RTCPeerConnection({
+    const API_URL = window.location.hostname === 'localhost' 
+      ? 'http://localhost:5000'
+      : 'https://infipeak-api.onrender.com';
+
+    const ICE_CONFIG = {
         iceServers: [
           // STUN servers
           { urls: "stun:stun.l.google.com:19302" },
@@ -325,124 +81,141 @@
             credential: "PNjqNPkm8ZJeirfm",
           },
         ],
-        iceCandidatePoolSize: 10,
-        bundlePolicy: 'max-bundle',
-        rtcpMuxPolicy: 'require'
-      });
+      iceTransportPolicy: 'all', // all = try TURN + STUN + host
+      iceCandidatePoolSize: 10,
+      bundlePolicy: 'max-bundle',
+      rtcpMuxPolicy: 'require'
+    };
 
-      // إضافة tracks فقط إذا كانت موجودة
-      if (stream) {
-        stream.getTracks().forEach(track => {
-          // التأكد من أن track مفعل
-          track.enabled = true;
-          
-          // إضافة track للـ peer connection
-          const sender = pc.addTrack(track, stream);
-          console.log('Added track:', track.kind, 'enabled:', track.enabled, 'readyState:', track.readyState);
-          
-          // مراقبة حالة track
-          track.onended = () => {
-            console.log('Local track ended:', track.kind);
-          };
-          
-          track.onmute = () => {
-            console.warn('Local track muted:', track.kind);
-          };
-          
-          track.onunmute = () => {
-            console.log('Local track unmuted:', track.kind);
-          };
+    // ========================
+    // WebRTC State
+    // ========================
+    let pc = null;
+    let localStream = null;
+    let socket = null;
+    let isCaller = false;  // Critical: determines who creates offer
+    let pendingIceCandidates = [];
+    let makingOffer = false;
+    let ignoreOffer = false;
+
+    const localVideo = document.getElementById('local');
+    const remoteVideo = document.getElementById('remote');
+    const statusEl = document.getElementById('status');
+
+    // ========================
+    // Initialize
+    // ========================
+    async function init() {
+      try {
+        updateStatus('Getting media devices...');
+        localStream = await navigator.mediaDevices.getUserMedia({ 
+          video: true, 
+          audio: true 
         });
-        
-        // التأكد من وجود audio و video tracks
-        const audioTracks = stream.getAudioTracks();
-        const videoTracks = stream.getVideoTracks();
-        console.log('Audio tracks:', audioTracks.length, 'Video tracks:', videoTracks.length);
-      }
+        localVideo.srcObject = localStream;
+        console.log('✅ Local media acquired');
 
-      // معالجة remote tracks
+        updateStatus('Connecting to signaling server...');
+        socket = io(API_URL, { auth: { token } });
+
+        socket.on('connect', () => {
+          console.log('✅ Socket connected');
+          socket.emit('join-room', { bookingId });
+        });
+
+        socket.on('joined', (data) => {
+          isCaller = data.isFirst;
+          console.log(`✅ Joined room. Role: ${isCaller ? 'CALLER' : 'CALLEE'}`);
+          updateStatus(isCaller ? 'Waiting for peer...' : 'Connecting...');
+          createPeerConnection();
+        });
+
+        socket.on('peer-joined', () => {
+          console.log('✅ Peer joined');
+          updateStatus('Peer connected. Negotiating...');
+          // Caller initiates offer when peer joins (with delay to avoid collision)
+          if (isCaller) {
+            setTimeout(() => {
+              negotiate();
+            }, 500);
+          }
+        });
+
+        socket.on('signal', handleSignal);
+
+        socket.on('room-full', () => {
+          alert('Room full (max 2 peers)');
+          updateStatus('Room full');
+        });
+
+        socket.on('disconnect', () => {
+          console.log('❌ Socket disconnected');
+          updateStatus('Disconnected');
+        });
+
+      } catch (err) {
+        console.error('❌ Initialization failed:', err);
+        updateStatus('Error: ' + err.message);
+        alert('Failed to access camera/microphone: ' + err.message);
+      }
+    }
+
+    // ========================
+    // Peer Connection Setup
+    // ========================
+    function createPeerConnection() {
+      pc = new RTCPeerConnection(ICE_CONFIG);
+
+      // Add local tracks
+      localStream.getTracks().forEach(track => {
+        track.enabled = true; // Ensure enabled
+        pc.addTrack(track, localStream);
+        console.log(`✅ Added ${track.kind} track (enabled: ${track.enabled})`);
+      });
+      
+      console.log(`📊 Local stream: ${localStream.getAudioTracks().length} audio, ${localStream.getVideoTracks().length} video`);
+
+      // Handle remote tracks
       pc.ontrack = (e) => {
-        console.log('🎥 Received remote track:', e.track.kind, 'from', e.streams.length, 'stream(s)');
-        
-        if (e.streams && e.streams.length > 0) {
-          const remoteStream = e.streams[0];
+        console.log(`📡 Remote ${e.track.kind} track received (enabled: ${e.track.enabled}, muted: ${e.track.muted})`);
+        if (e.streams[0]) {
+          const stream = e.streams[0];
           
-          // إذا كان هناك stream موجود، أضف الـ tracks الجديدة إليه
-          if (remoteVideo.srcObject) {
-            const existingStream = remoteVideo.srcObject;
-            e.streams[0].getTracks().forEach(track => {
-              // تجنب إضافة tracks مكررة
-              const existingTrack = existingStream.getTracks().find(t => t.id === track.id);
-              if (!existingTrack) {
+          // Set remote video stream
+          if (!remoteVideo.srcObject) {
+            remoteVideo.srcObject = stream;
+            console.log('✅ Remote stream set');
+          } else {
+            // Add new tracks to existing stream
+            stream.getTracks().forEach(track => {
+              const existingStream = remoteVideo.srcObject;
+              if (!existingStream.getTracks().find(t => t.id === track.id)) {
                 existingStream.addTrack(track);
-                console.log('Added new track to existing stream:', track.kind);
+                console.log(`➕ Added ${track.kind} track to stream`);
               }
             });
-          } else {
-            remoteVideo.srcObject = remoteStream;
-            console.log('Set new remote stream');
           }
           
-          // التأكد من أن audio غير muted
+          // Ensure video is not muted
           remoteVideo.muted = false;
           remoteVideo.volume = 1.0;
           
-          // إضافة event listeners للـ stream
-          remoteStream.getTracks().forEach(track => {
-            console.log('📡 Remote track:', track.kind, 'enabled:', track.enabled, 'readyState:', track.readyState, 'muted:', track.muted);
-            
-            // التأكد من أن track مفعل وغير muted
-            track.enabled = true;
-            
-            // إذا كان track muted، نحاول unmute
-            if (track.muted) {
-              console.log('Unmuting remote track:', track.kind);
-              // Note: track.muted is read-only, but we can ensure it's enabled
-              track.enabled = true;
-            }
-            
-            track.onended = () => {
-              console.log('⚠️ Remote track ended:', track.kind);
-            };
-            
-            track.onmute = () => {
-              console.warn('⚠️ Remote track muted:', track.kind);
-              // محاولة إعادة تفعيل
-              track.enabled = true;
-            };
-            
-            track.onunmute = () => {
-              console.log('✅ Remote track unmuted:', track.kind);
-            };
+          // Force play
+          remoteVideo.play().catch(err => {
+            console.log('Play error:', err);
           });
           
-          // التحقق من وجود audio tracks
-          const audioTracks = remoteStream.getAudioTracks();
-          const videoTracks = remoteStream.getVideoTracks();
-          console.log('📊 Remote stream - Audio:', audioTracks.length, 'Video:', videoTracks.length);
-          
-          if (audioTracks.length > 0) {
-            console.log('🔊 Audio track found and enabled');
-          } else {
-            console.warn('⚠️ No audio track in remote stream');
-          }
-          
-          document.getElementById('loading').style.display = 'none';
-          console.log('✅ Remote video stream set successfully');
-          
-          // تشغيل الفيديو
-          remoteVideo.play().then(() => {
-            console.log('▶️ Remote video playing');
-          }).catch(err => {
-            console.error('❌ Error playing remote video:', err);
+          // Log all tracks
+          stream.getTracks().forEach(track => {
+            console.log(`  - ${track.kind}: enabled=${track.enabled}, muted=${track.muted}, readyState=${track.readyState}`);
           });
         }
       };
 
-      // إرسال ICE candidates
+      // ICE candidate handling
       pc.onicecandidate = (e) => {
         if (e.candidate) {
-          console.log(`📤 Sending ICE candidate: ${e.candidate.type || 'unknown'} (${e.candidate.protocol || 'unknown'})`);
+          console.log(`📤 Sending ICE candidate: ${e.candidate.type} (${e.candidate.protocol})`);
           socket.emit('signal', {
             bookingId,
             signal: JSON.stringify({ ice: e.candidate })
@@ -452,244 +225,219 @@
         }
       };
 
-      // مراقبة حالة الاتصال
+      // Connection state monitoring
       pc.onconnectionstatechange = () => {
         console.log('Connection state:', pc.connectionState);
+        updateStatus('Connection: ' + pc.connectionState);
+        
         if (pc.connectionState === 'connected') {
-          document.getElementById('loading').style.display = 'none';
-          console.log('✅ WebRTC connection established!');
-        } else if (pc.connectionState === 'failed' || pc.connectionState === 'disconnected') {
-          console.error('❌ WebRTC connection', pc.connectionState);
-          // محاولة إعادة الاتصال
-          if (pc.connectionState === 'failed') {
-            console.log('Attempting to restart ICE...');
-            pc.restartIce();
-          }
-        }
-      };
-
-      // مراقبة ICE connection state
-      pc.oniceconnectionstatechange = () => {
-        console.log('ICE connection state:', pc.iceConnectionState);
-        if (pc.iceConnectionState === 'failed') {
-          console.log('ICE connection failed, restarting...');
+          updateStatus('Connected ✅');
+        } else if (pc.connectionState === 'failed') {
+          console.log('🔄 Connection failed, restarting ICE');
           pc.restartIce();
         }
       };
 
-      // مراقبة signaling state
+      pc.oniceconnectionstatechange = () => {
+        console.log('ICE state:', pc.iceConnectionState);
+        if (pc.iceConnectionState === 'connected' || pc.iceConnectionState === 'completed') {
+          updateStatus('ICE Connected ✅');
+        } else if (pc.iceConnectionState === 'failed') {
+          updateStatus('ICE Failed - Retrying...');
+          console.log('🔄 ICE failed, restarting...');
+          pc.restartIce();
+        } else if (pc.iceConnectionState === 'disconnected') {
+          updateStatus('ICE Disconnected - Reconnecting...');
+        }
+      };
+
       pc.onsignalingstatechange = () => {
         console.log('Signaling state:', pc.signalingState);
       };
 
-      socket.on('joined', async (data) => {
-        console.log('✅ Joined room successfully', data);
-        isReady = true;
-        isInitiator = data.isFirst;
+      // Disable automatic negotiation - we control it manually
+      pc.onnegotiationneeded = async () => {
+        console.log('⚠️ Negotiation needed (ignored - manual control)');
+        // Disabled: we manually call negotiate() when peer joins
+      };
+    }
+
+    // ========================
+    // Negotiation (Offer/Answer)
+    // ========================
+    async function negotiate() {
+      if (!isCaller || makingOffer) return;
+      
+      try {
+        makingOffer = true;
+        console.log('📤 Creating offer...');
         
-        console.log(`Role: ${isInitiator ? 'CALLER (will create offer)' : 'CALLEE (will wait for offer)'}`);
+        // Race condition guard
+        if (pc.signalingState !== 'stable') {
+          console.log('⚠️ Signaling state not stable, aborting offer');
+          return;
+        }
         
-        if (data.isFirst) {
-          // إذا كنا الأول (CALLER)، ننتظر حتى ينضم شخص آخر
-          console.log('⏳ Waiting for peer to join...');
-        } else {
-          // إذا كنا الثاني (CALLEE)، ننتظر offer من الأول
-          console.log('⏳ Waiting for offer from caller...');
-          // لا نرسل offer - فقط ننتظر
-        }
-      });
+        const offer = await pc.createOffer({
+          offerToReceiveAudio: true,
+          offerToReceiveVideo: true
+        });
+        
+        await pc.setLocalDescription(offer);
+        console.log('📤 Sending offer');
+        
+        socket.emit('signal', {
+          bookingId,
+          signal: JSON.stringify({ sdp: pc.localDescription })
+        });
+      } catch (err) {
+        console.error('❌ Negotiation failed:', err);
+      } finally {
+        makingOffer = false;
+      }
+    }
 
-      socket.on('peer-joined', async () => {
-        // عندما ينضم شخص آخر، الأول (CALLER) فقط يرسل offer
-        if (isInitiator && isReady) {
-          console.log('✅ Peer joined, creating offer as CALLER...');
-          setTimeout(async () => {
-            try {
-              // التحقق من أن signaling state stable
-              if (pc.signalingState !== 'stable') {
-                console.warn('⚠️ Signaling state not stable:', pc.signalingState);
-                return;
-              }
-              
-              const offer = await pc.createOffer({
-                offerToReceiveAudio: true,
-                offerToReceiveVideo: true
-              });
-              await pc.setLocalDescription(offer);
-              console.log('📤 Sending offer');
-              socket.emit('signal', {
-                bookingId,
-                signal: JSON.stringify({ sdp: offer })
-              });
-            } catch (error) {
-              console.error('❌ Error creating offer:', error);
-            }
-          }, 500);
-        } else {
-          console.log('ℹ️ Peer joined, but I am CALLEE - waiting for offer');
-        }
-      });
+    // ========================
+    // Signal Handling
+    // ========================
+    async function handleSignal(data) {
+      try {
+        const msg = JSON.parse(data);
 
-      socket.on('room-full', () => {
-        alert('الغرفة ممتلئة (شخصان فقط)');
-      });
-
-      socket.on('signal', async (data) => {
-        try {
-          const msg = JSON.parse(data);
-          console.log('Received signal:', Object.keys(msg));
+        // Handle SDP
+        if (msg.sdp) {
+          const description = new RTCSessionDescription(msg.sdp);
           
-          if (msg.sdp) {
-            const description = new RTCSessionDescription(msg.sdp);
-            console.log(`📥 Received ${description.type}, Current state: ${pc.signalingState}`);
+          // Perfect Negotiation: Check for offer collision
+          const offerCollision = description.type === 'offer' && 
+                                 (makingOffer || pc.signalingState !== 'stable');
+
+          ignoreOffer = !isCaller && offerCollision;
+          if (ignoreOffer) {
+            console.log('⚠️ Ignoring colliding offer (Perfect Negotiation)');
+            return;
+          }
+
+          console.log(`📥 Received ${description.type} (Role: ${isCaller ? 'CALLER' : 'CALLEE'}, State: ${pc.signalingState})`);
+
+          // Validate state before setting remote description
+          if (description.type === 'offer') {
+            // CALLEE only should handle offers
+            if (isCaller) {
+              console.warn('⚠️ CALLER received offer - ignoring');
+              return;
+            }
+            if (pc.signalingState !== 'stable' && pc.signalingState !== 'have-local-offer') {
+              console.warn(`⚠️ Cannot set offer in state: ${pc.signalingState}`);
+              return;
+            }
+          } else if (description.type === 'answer') {
+            // CALLER only should handle answers
+            if (!isCaller) {
+              console.warn('⚠️ CALLEE received answer - ignoring');
+              return;
+            }
+            if (pc.signalingState !== 'have-local-offer') {
+              console.warn(`⚠️ Cannot set answer in state: ${pc.signalingState}, expected: have-local-offer`);
+              return;
+            }
+          }
+
+          // Set remote description
+          await pc.setRemoteDescription(description);
+          console.log(`✅ Remote ${description.type} set`);
+
+          // If we received an offer, create answer (CALLEE only)
+          if (description.type === 'offer') {
+            console.log('📤 Creating answer (as CALLEE)...');
+            const answer = await pc.createAnswer({
+              offerToReceiveAudio: true,
+              offerToReceiveVideo: true
+            });
+            await pc.setLocalDescription(answer);
             
-            try {
-              if (description.type === 'offer') {
-                // CALLEE only: إذا استقبلنا offer، نكون answer
-                if (!isInitiator && (pc.signalingState === 'stable' || pc.signalingState === 'have-local-offer')) {
-                  console.log('📥 Setting remote offer (as CALLEE)...');
-                  await pc.setRemoteDescription(description);
-                  console.log('✅ Remote offer set, creating answer...');
-                  
-                  const answer = await pc.createAnswer({
-                    offerToReceiveAudio: true,
-                    offerToReceiveVideo: true
-                  });
-                  await pc.setLocalDescription(answer);
-                  console.log('📤 Sending answer');
-                  socket.emit('signal', {
-                    bookingId,
-                    signal: JSON.stringify({ sdp: answer })
-                  });
-                  
-                  // إضافة pending ICE candidates
-                  if (pc.pendingIceCandidates && pc.pendingIceCandidates.length > 0) {
-                    console.log(`📥 Adding ${pc.pendingIceCandidates.length} pending ICE candidates`);
-                    for (const candidate of pc.pendingIceCandidates) {
-                      try {
-                        await pc.addIceCandidate(candidate);
-                      } catch (e) {
-                        console.error('❌ Error adding pending ICE:', e);
-                      }
-                    }
-                    pc.pendingIceCandidates = [];
-                  }
-                } else {
-                  console.warn(`⚠️ Ignoring offer - Role: ${isInitiator ? 'CALLER' : 'CALLEE'}, State: ${pc.signalingState}`);
-                }
-              } else if (description.type === 'answer') {
-                // CALLER only: إذا استقبلنا answer، نضيفه
-                if (isInitiator && pc.signalingState === 'have-local-offer') {
-                  console.log('📥 Setting remote answer (as CALLER)...');
-                  await pc.setRemoteDescription(description);
-                  console.log('✅ Remote answer set successfully');
-                  
-                  // إضافة pending ICE candidates
-                  if (pc.pendingIceCandidates && pc.pendingIceCandidates.length > 0) {
-                    console.log(`📥 Adding ${pc.pendingIceCandidates.length} pending ICE candidates`);
-                    for (const candidate of pc.pendingIceCandidates) {
-                      try {
-                        await pc.addIceCandidate(candidate);
-                      } catch (e) {
-                        console.error('❌ Error adding pending ICE:', e);
-                      }
-                    }
-                    pc.pendingIceCandidates = [];
-                  }
-                } else {
-                  console.warn(`⚠️ Ignoring answer - Role: ${isInitiator ? 'CALLER' : 'CALLEE'}, State: ${pc.signalingState}`);
-                }
-              }
-            } catch (sdpError) {
-              console.error('❌ Error handling SDP:', sdpError);
-            }
+            console.log('📤 Sending answer');
+            socket.emit('signal', {
+              bookingId,
+              signal: JSON.stringify({ sdp: pc.localDescription })
+            });
           }
-          
-          if (msg.ice) {
-            const candidate = new RTCIceCandidate(msg.ice);
-            try {
-              if (pc.remoteDescription) {
+
+          // Add pending ICE candidates after SDP is set
+          if (pendingIceCandidates.length > 0) {
+            console.log(`📥 Adding ${pendingIceCandidates.length} pending ICE candidates`);
+            for (const candidate of pendingIceCandidates) {
+              try {
                 await pc.addIceCandidate(candidate);
-                console.log(`✅ ICE candidate added: ${candidate.type || 'unknown'}`);
-              } else {
-                console.log('⏳ Queuing ICE candidate (waiting for remote description)');
-                // حفظ ICE candidate مؤقتاً
-                if (!pc.pendingIceCandidates) {
-                  pc.pendingIceCandidates = [];
-                }
-                pc.pendingIceCandidates.push(candidate);
+              } catch (err) {
+                console.error('❌ Failed to add pending ICE:', err);
               }
-            } catch (error) {
-              console.error('❌ Error adding ICE candidate:', error);
             }
+            pendingIceCandidates = [];
           }
-        } catch (error) {
-          console.error('Error handling signal:', error);
         }
-      });
 
-      // الانضمام للغرفة
-      socket.emit('join-room', { bookingId });
-      
-    } catch (error) {
-      console.error('Error accessing media devices:', error);
-      const loadingEl = document.getElementById('loading');
-      loadingEl.textContent = 'خطأ: ' + error.message;
-      loadingEl.style.color = '#ff4444';
-      
-      // عرض رسالة خطأ مفصلة
-      const errorDetails = getErrorMessage(error);
-      const userMessage = errorDetails + '\n\n' +
-        'الحلول المقترحة:\n' +
-        '1. تأكد من أن الكاميرا/الميكروفون غير مستخدمة من تطبيق آخر\n' +
-        '2. أعد تحميل الصفحة وحاول مرة أخرى\n' +
-        '3. تأكد من السماح بالوصول إلى الكاميرا/الميكروفون في إعدادات المتصفح\n' +
-        '4. جرب متصفح آخر';
-      
-      if (confirm(userMessage + '\n\nهل تريد المتابعة بدون كاميرا؟')) {
-        // المتابعة بدون كاميرا (audio only أو بدون أي شيء)
-        localVideo.style.display = 'none';
-        document.getElementById('loading').textContent = 'جاري الاتصال بدون كاميرا...';
-        // المتابعة مع الاتصال
-      } else {
-        window.location.href = 'index.html';
+        // Handle ICE candidates
+        if (msg.ice) {
+          const candidate = new RTCIceCandidate(msg.ice);
+          console.log(`📥 Received ICE candidate: ${candidate.type || 'unknown'}`);
+          
+          if (pc.remoteDescription) {
+            try {
+              await pc.addIceCandidate(candidate);
+              console.log('✅ ICE candidate added');
+            } catch (err) {
+              if (!ignoreOffer) {
+                console.error('❌ Failed to add ICE:', err);
+              }
+            }
+          } else {
+            // Queue until remote description is set
+            console.log('⏳ Queuing ICE candidate (no remote description yet)');
+            pendingIceCandidates.push(candidate);
+          }
+        }
+      } catch (err) {
+        console.error('❌ Signal handling error:', err);
       }
     }
 
-    // دالة للحصول على رسالة خطأ واضحة
-    function getErrorMessage(error) {
-      if (error.name === 'NotReadableError') {
-        return 'الكاميرا/الميكروفون مستخدمة من تطبيق آخر. أغلقه وحاول مرة أخرى.';
-      } else if (error.name === 'NotAllowedError') {
-        return 'تم رفض الوصول إلى الكاميرا/الميكروفون. يرجى السماح بالوصول في إعدادات المتصفح.';
-      } else if (error.name === 'NotFoundError') {
-        return 'لم يتم العثور على كاميرا/ميكروفون. تأكد من توصيل الجهاز.';
-      } else if (error.name === 'OverconstrainedError') {
-        return 'الكاميرا لا تدعم الإعدادات المطلوبة.';
-      } else {
-        return error.message || 'حدث خطأ غير معروف أثناء الوصول إلى الكاميرا/الميكروفون.';
+    // ========================
+    // UI Controls
+    // ========================
+    document.getElementById('toggleAudio').onclick = () => {
+      const audioTrack = localStream.getAudioTracks()[0];
+      if (audioTrack) {
+        audioTrack.enabled = !audioTrack.enabled;
+        document.getElementById('toggleAudio').textContent = 
+          audioTrack.enabled ? 'Mute Audio' : 'Unmute Audio';
       }
+    };
+
+    document.getElementById('toggleVideo').onclick = () => {
+      const videoTrack = localStream.getVideoTracks()[0];
+      if (videoTrack) {
+        videoTrack.enabled = !videoTrack.enabled;
+        document.getElementById('toggleVideo').textContent = 
+          videoTrack.enabled ? 'Stop Video' : 'Start Video';
+      }
+    };
+
+    document.getElementById('endCall').onclick = () => {
+      if (pc) pc.close();
+      if (localStream) {
+        localStream.getTracks().forEach(track => track.stop());
+      }
+      if (socket) socket.disconnect();
+      window.location.href = 'index.html';
+    };
+
+    function updateStatus(text) {
+      statusEl.textContent = text;
     }
 
-    // عرض معلومات المستخدم
-    try {
-      const response = await fetch(`${API_URL}/bookings/me`, {
-        headers: {
-          'Authorization': `Bearer ${token}`
-        }
-      });
-      if (response.ok) {
-        const bookings = await response.json();
-        const booking = bookings.find(b => b.id === bookingId);
-        if (booking) {
-          document.getElementById('userBadge').textContent = 
-            `Booking: ${bookingId.substring(0, 8)}... | Status: ${booking.status}`;
-        }
-      }
-    } catch (e) {
-      console.error('Failed to load booking info:', e);
-    }
-  })();
+    // Start
+    init();
   </script>
 </body>
 </html>
