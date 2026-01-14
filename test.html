@@ -56,9 +56,25 @@
       iceServers: [
         { urls: 'stun:stun.l.google.com:19302' },
         { urls: 'stun:stun1.l.google.com:19302' },
-        // TURN server (required for production behind NAT/firewall):
-        // { urls: 'turn:your-turn-server.com:3478', username: 'user', credential: 'pass' }
+        { urls: 'stun:stun2.l.google.com:19302' },
+        // Free TURN servers for testing (replace with your own in production)
+        {
+          urls: 'turn:openrelay.metered.ca:80',
+          username: 'openrelayproject',
+          credential: 'openrelayproject'
+        },
+        {
+          urls: 'turn:openrelay.metered.ca:443',
+          username: 'openrelayproject',
+          credential: 'openrelayproject'
+        },
+        {
+          urls: 'turn:openrelay.metered.ca:443?transport=tcp',
+          username: 'openrelayproject',
+          credential: 'openrelayproject'
+        }
       ],
+      iceTransportPolicy: 'all', // Try all: relay + direct
       iceCandidatePoolSize: 10
     };
 
@@ -141,26 +157,60 @@
 
       // Add local tracks
       localStream.getTracks().forEach(track => {
+        track.enabled = true; // Ensure enabled
         pc.addTrack(track, localStream);
-        console.log(`Added ${track.kind} track`);
+        console.log(`✅ Added ${track.kind} track (enabled: ${track.enabled})`);
       });
+      
+      console.log(`📊 Local stream: ${localStream.getAudioTracks().length} audio, ${localStream.getVideoTracks().length} video`);
 
       // Handle remote tracks
       pc.ontrack = (e) => {
-        console.log(`📡 Remote ${e.track.kind} track received`);
+        console.log(`📡 Remote ${e.track.kind} track received (enabled: ${e.track.enabled}, muted: ${e.track.muted})`);
         if (e.streams[0]) {
-          remoteVideo.srcObject = e.streams[0];
+          const stream = e.streams[0];
+          
+          // Set remote video stream
+          if (!remoteVideo.srcObject) {
+            remoteVideo.srcObject = stream;
+            console.log('✅ Remote stream set');
+          } else {
+            // Add new tracks to existing stream
+            stream.getTracks().forEach(track => {
+              const existingStream = remoteVideo.srcObject;
+              if (!existingStream.getTracks().find(t => t.id === track.id)) {
+                existingStream.addTrack(track);
+                console.log(`➕ Added ${track.kind} track to stream`);
+              }
+            });
+          }
+          
+          // Ensure video is not muted
           remoteVideo.muted = false;
+          remoteVideo.volume = 1.0;
+          
+          // Force play
+          remoteVideo.play().catch(err => {
+            console.log('Play error:', err);
+          });
+          
+          // Log all tracks
+          stream.getTracks().forEach(track => {
+            console.log(`  - ${track.kind}: enabled=${track.enabled}, muted=${track.muted}, readyState=${track.readyState}`);
+          });
         }
       };
 
       // ICE candidate handling
       pc.onicecandidate = (e) => {
         if (e.candidate) {
+          console.log(`📤 Sending ICE candidate: ${e.candidate.type} (${e.candidate.protocol})`);
           socket.emit('signal', {
             bookingId,
             signal: JSON.stringify({ ice: e.candidate })
           });
+        } else {
+          console.log('✅ ICE gathering complete');
         }
       };
 
@@ -179,6 +229,15 @@
 
       pc.oniceconnectionstatechange = () => {
         console.log('ICE state:', pc.iceConnectionState);
+        if (pc.iceConnectionState === 'connected' || pc.iceConnectionState === 'completed') {
+          updateStatus('ICE Connected ✅');
+        } else if (pc.iceConnectionState === 'failed') {
+          updateStatus('ICE Failed - Retrying...');
+          console.log('🔄 ICE failed, restarting...');
+          pc.restartIce();
+        } else if (pc.iceConnectionState === 'disconnected') {
+          updateStatus('ICE Disconnected - Reconnecting...');
+        }
       };
 
       pc.onsignalingstatechange = () => {
@@ -279,17 +338,20 @@
         // Handle ICE candidates
         if (msg.ice) {
           const candidate = new RTCIceCandidate(msg.ice);
+          console.log(`📥 Received ICE candidate: ${candidate.type || 'unknown'}`);
           
           if (pc.remoteDescription) {
             try {
               await pc.addIceCandidate(candidate);
+              console.log('✅ ICE candidate added');
             } catch (err) {
               if (!ignoreOffer) {
-                console.error('Failed to add ICE:', err);
+                console.error('❌ Failed to add ICE:', err);
               }
             }
           } else {
             // Queue until remote description is set
+            console.log('⏳ Queuing ICE candidate (no remote description yet)');
             pendingIceCandidates.push(candidate);
           }
         }
