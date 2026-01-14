@@ -40,12 +40,25 @@
     // ========================
     // Configuration
     // ========================
+    // Security: Validate and sanitize inputs
     const token = localStorage.getItem('jwt_token');
     const bookingId = localStorage.getItem('booking_id');
     
-    if (!token || !bookingId) {
-      alert('Login required');
+    // Security: Validate token format (basic JWT check)
+    if (!token || typeof token !== 'string' || token.split('.').length !== 3) {
+      alert('Invalid authentication token');
+      localStorage.removeItem('jwt_token');
+      localStorage.removeItem('booking_id');
       window.location.href = 'index.html';
+      return;
+    }
+    
+    // Security: Validate booking ID format
+    if (!bookingId || typeof bookingId !== 'string' || bookingId.length > 100 || !/^[a-zA-Z0-9_-]+$/.test(bookingId)) {
+      alert('Invalid booking ID');
+      localStorage.removeItem('booking_id');
+      window.location.href = 'index.html';
+      return;
     }
 
     const API_URL = window.location.hostname === 'localhost' 
@@ -142,6 +155,11 @@
         });
 
         socket.on('signal', handleSignal);
+        
+        socket.on('error', (error) => {
+          console.error('❌ Socket error:', error);
+          updateStatus('Connection error');
+        });
 
         socket.on('room-full', () => {
           alert('Room full (max 2 peers)');
@@ -302,7 +320,25 @@
     // ========================
     async function handleSignal(data) {
       try {
+        // Security: Validate signal data
+        if (!data || typeof data !== 'string') {
+          console.warn('⚠️ Invalid signal data received');
+          return;
+        }
+
+        // Security: Limit signal size to prevent DoS
+        if (data.length > 10000) {
+          console.warn('⚠️ Signal too large, ignoring');
+          return;
+        }
+
         const msg = JSON.parse(data);
+        
+        // Security: Validate message structure
+        if (!msg || typeof msg !== 'object') {
+          console.warn('⚠️ Invalid signal message format');
+          return;
+        }
 
         // Handle SDP
         if (msg.sdp) {
