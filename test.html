@@ -159,7 +159,7 @@
     </div>
 
     <!-- Videos -->
-    <video id="remote" autoplay playsinline></video>
+    <video id="remote" autoplay playsinline controls></video>
     <video id="local" autoplay muted playsinline></video>
     
     <!-- Loading indicator -->
@@ -272,6 +272,13 @@
       
       if (stream) {
         localVideo.srcObject = stream;
+        localVideo.muted = true; // mute الفيديو المحلي (عادة)
+        
+        // التأكد من أن جميع tracks مفعلة
+        stream.getTracks().forEach(track => {
+          console.log('Local track:', track.kind, track.enabled, track.readyState);
+          track.enabled = true;
+        });
         
         // إذا لم يكن هناك video track، أخفي الفيديو المحلي
         const videoTracks = stream.getVideoTracks();
@@ -279,39 +286,152 @@
           localVideo.style.display = 'none';
           console.log('No video track, hiding local video');
         }
+        
+        // تشغيل الفيديو المحلي
+        localVideo.play().catch(err => {
+          console.error('Error playing local video:', err);
+        });
       } else {
         throw new Error('فشل الوصول إلى الكاميرا/الميكروفون');
       }
 
+      // إعدادات WebRTC محسنة
       pc = new RTCPeerConnection({
-        iceServers: [{ urls: 'stun:stun.l.google.com:19302' }]
+        iceServers: [
+          { urls: 'stun:stun.l.google.com:19302' },
+          { urls: 'stun:stun1.l.google.com:19302' }
+        ],
+        iceCandidatePoolSize: 10
       });
 
       // إضافة tracks فقط إذا كانت موجودة
       if (stream) {
         stream.getTracks().forEach(track => {
-          pc.addTrack(track, stream);
-          console.log('Added track:', track.kind, track.enabled);
+          // التأكد من أن track مفعل
+          track.enabled = true;
+          
+          // إضافة track للـ peer connection
+          const sender = pc.addTrack(track, stream);
+          console.log('Added track:', track.kind, 'enabled:', track.enabled, 'readyState:', track.readyState);
+          
+          // مراقبة حالة track
+          track.onended = () => {
+            console.log('Local track ended:', track.kind);
+          };
+          
+          track.onmute = () => {
+            console.warn('Local track muted:', track.kind);
+          };
+          
+          track.onunmute = () => {
+            console.log('Local track unmuted:', track.kind);
+          };
         });
+        
+        // التأكد من وجود audio و video tracks
+        const audioTracks = stream.getAudioTracks();
+        const videoTracks = stream.getVideoTracks();
+        console.log('Audio tracks:', audioTracks.length, 'Video tracks:', videoTracks.length);
       }
 
+      // معالجة remote tracks
       pc.ontrack = (e) => {
-        console.log('Received remote track');
-        remoteVideo.srcObject = e.streams[0];
-        document.getElementById('loading').style.display = 'none';
-      };
-
-      pc.onicecandidate = (e) => {
-        if (e.candidate && isReady) {
-          socket.emit('signal', {
-            bookingId,
-            signal: JSON.stringify({ ice: e.candidate })
+        console.log('🎥 Received remote track:', e.track.kind, 'from', e.streams.length, 'stream(s)');
+        
+        if (e.streams && e.streams.length > 0) {
+          const remoteStream = e.streams[0];
+          
+          // إذا كان هناك stream موجود، أضف الـ tracks الجديدة إليه
+          if (remoteVideo.srcObject) {
+            const existingStream = remoteVideo.srcObject;
+            e.streams[0].getTracks().forEach(track => {
+              // تجنب إضافة tracks مكررة
+              const existingTrack = existingStream.getTracks().find(t => t.id === track.id);
+              if (!existingTrack) {
+                existingStream.addTrack(track);
+                console.log('Added new track to existing stream:', track.kind);
+              }
+            });
+          } else {
+            remoteVideo.srcObject = remoteStream;
+            console.log('Set new remote stream');
+          }
+          
+          // التأكد من أن audio غير muted
+          remoteVideo.muted = false;
+          remoteVideo.volume = 1.0;
+          
+          // إضافة event listeners للـ stream
+          remoteStream.getTracks().forEach(track => {
+            console.log('📡 Remote track:', track.kind, 'enabled:', track.enabled, 'readyState:', track.readyState, 'muted:', track.muted);
+            
+            // التأكد من أن track مفعل
+            track.enabled = true;
+            
+            track.onended = () => {
+              console.log('⚠️ Remote track ended:', track.kind);
+            };
+            
+            track.onmute = () => {
+              console.warn('⚠️ Remote track muted:', track.kind);
+            };
+            
+            track.onunmute = () => {
+              console.log('✅ Remote track unmuted:', track.kind);
+            };
+          });
+          
+          // التحقق من وجود audio tracks
+          const audioTracks = remoteStream.getAudioTracks();
+          const videoTracks = remoteStream.getVideoTracks();
+          console.log('📊 Remote stream - Audio:', audioTracks.length, 'Video:', videoTracks.length);
+          
+          if (audioTracks.length > 0) {
+            console.log('🔊 Audio track found and enabled');
+          } else {
+            console.warn('⚠️ No audio track in remote stream');
+          }
+          
+          document.getElementById('loading').style.display = 'none';
+          console.log('✅ Remote video stream set successfully');
+          
+          // تشغيل الفيديو
+          remoteVideo.play().then(() => {
+            console.log('▶️ Remote video playing');
+          }).catch(err => {
+            console.error('❌ Error playing remote video:', err);
           });
         }
       };
 
+      // إرسال ICE candidates
+      pc.onicecandidate = (e) => {
+        if (e.candidate) {
+          console.log('Sending ICE candidate');
+          socket.emit('signal', {
+            bookingId,
+            signal: JSON.stringify({ ice: e.candidate })
+          });
+        } else {
+          console.log('ICE gathering complete');
+        }
+      };
+
+      // مراقبة حالة الاتصال
       pc.onconnectionstatechange = () => {
         console.log('Connection state:', pc.connectionState);
+        if (pc.connectionState === 'connected') {
+          document.getElementById('loading').style.display = 'none';
+          console.log('✅ WebRTC connection established!');
+        } else if (pc.connectionState === 'failed') {
+          console.error('❌ WebRTC connection failed');
+          document.getElementById('loading').textContent = 'فشل الاتصال. جاري إعادة المحاولة...';
+        }
+      };
+
+      // مراقبة ICE connection state
+      pc.oniceconnectionstatechange = () => {
+        console.log('ICE connection state:', pc.iceConnectionState);
       };
 
       socket.on('joined', async (data) => {
@@ -327,7 +447,10 @@
           console.log('Second person joined, creating offer...');
           setTimeout(async () => {
             try {
-              const offer = await pc.createOffer();
+              const offer = await pc.createOffer({
+                offerToReceiveAudio: true,
+                offerToReceiveVideo: true
+              });
               await pc.setLocalDescription(offer);
               console.log('Sending offer');
               socket.emit('signal', {
@@ -347,7 +470,10 @@
           console.log('Peer joined, creating offer...');
           setTimeout(async () => {
             try {
-              const offer = await pc.createOffer();
+              const offer = await pc.createOffer({
+                offerToReceiveAudio: true,
+                offerToReceiveVideo: true
+              });
               await pc.setLocalDescription(offer);
               console.log('Sending offer');
               socket.emit('signal', {
@@ -368,29 +494,76 @@
       socket.on('signal', async (data) => {
         try {
           const msg = JSON.parse(data);
+          console.log('Received signal:', Object.keys(msg));
           
           if (msg.sdp) {
             console.log('Received SDP:', msg.sdp.type);
             
+            try {
+              // إضافة SDP description
+              await pc.setRemoteDescription(new RTCSessionDescription(msg.sdp));
+              console.log('Remote description set:', msg.sdp.type);
+              
             if (msg.sdp.type === 'offer') {
               // إذا استقبلنا offer، نكون answer
-              await pc.setRemoteDescription(new RTCSessionDescription(msg.sdp));
-              const answer = await pc.createAnswer();
+              console.log('Creating answer...');
+              const answer = await pc.createAnswer({
+                offerToReceiveAudio: true,
+                offerToReceiveVideo: true
+              });
               await pc.setLocalDescription(answer);
               console.log('Sending answer');
               socket.emit('signal', {
                 bookingId,
                 signal: JSON.stringify({ sdp: answer })
               });
+              
+              // إضافة pending ICE candidates بعد setRemoteDescription
+              if (pc.pendingIceCandidates) {
+                console.log('Adding pending ICE candidates:', pc.pendingIceCandidates.length);
+                for (const candidate of pc.pendingIceCandidates) {
+                  try {
+                    await pc.addIceCandidate(candidate);
+                  } catch (e) {
+                    console.error('Error adding pending ICE candidate:', e);
+                  }
+                }
+                pc.pendingIceCandidates = [];
+              }
             } else if (msg.sdp.type === 'answer') {
-              // إذا استقبلنا answer، نضيفه
-              await pc.setRemoteDescription(new RTCSessionDescription(msg.sdp));
+              console.log('Answer received and set');
+              
+              // إضافة pending ICE candidates بعد setRemoteDescription
+              if (pc.pendingIceCandidates) {
+                console.log('Adding pending ICE candidates:', pc.pendingIceCandidates.length);
+                for (const candidate of pc.pendingIceCandidates) {
+                  try {
+                    await pc.addIceCandidate(candidate);
+                  } catch (e) {
+                    console.error('Error adding pending ICE candidate:', e);
+                  }
+                }
+                pc.pendingIceCandidates = [];
+              }
+            }
+            } catch (sdpError) {
+              console.error('Error handling SDP:', sdpError);
             }
           }
           
           if (msg.ice) {
             try {
-              await pc.addIceCandidate(new RTCIceCandidate(msg.ice));
+              if (pc.remoteDescription) {
+                await pc.addIceCandidate(new RTCIceCandidate(msg.ice));
+                console.log('ICE candidate added');
+              } else {
+                console.log('Waiting for remote description before adding ICE candidate');
+                // حفظ ICE candidate مؤقتاً
+                if (!pc.pendingIceCandidates) {
+                  pc.pendingIceCandidates = [];
+                }
+                pc.pendingIceCandidates.push(new RTCIceCandidate(msg.ice));
+              }
             } catch (error) {
               console.error('Error adding ICE candidate:', error);
             }
