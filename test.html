@@ -1,0 +1,467 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <title>Video Meeting</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+
+  <style>
+    * {
+      margin: 0;
+      padding: 0;
+      box-sizing: border-box;
+      font-family: "Segoe UI", system-ui, -apple-system, BlinkMacSystemFont, sans-serif;
+    }
+
+    body {
+      background: #0e0f13;
+      color: #fff;
+      height: 100vh;
+      overflow: hidden;
+    }
+
+    .meeting-container {
+      position: relative;
+      width: 100%;
+      height: 100%;
+      background: #0e0f13;
+    }
+
+    /* Main remote video (speaker view) */
+    #remote {
+      width: 100%;
+      height: 100%;
+      object-fit: cover;
+      background: #000;
+    }
+
+    /* Local self view (picture-in-picture) */
+    #local {
+      position: absolute;
+      bottom: 90px;
+      right: 24px;
+      width: 220px;
+      height: 140px;
+      border-radius: 12px;
+      object-fit: cover;
+      background: #000;
+      border: 1px solid rgba(255,255,255,0.15);
+      box-shadow: 0 10px 30px rgba(0,0,0,0.6);
+    }
+
+    /* Top bar */
+    .top-bar {
+      position: absolute;
+      top: 0;
+      left: 0;
+      width: 100%;
+      height: 56px;
+      display: flex;
+      align-items: center;
+      padding: 0 20px;
+      background: linear-gradient(to bottom, rgba(0,0,0,0.6), transparent);
+      z-index: 10;
+    }
+
+    .meeting-title {
+      font-size: 14px;
+      font-weight: 500;
+      opacity: 0.85;
+    }
+
+    .user-badge {
+      margin-right: auto;
+      font-size: 12px;
+      opacity: 0.7;
+      padding: 4px 12px;
+      background: rgba(255,255,255,0.1);
+      border-radius: 12px;
+    }
+
+ 
+    .controls {
+      position: absolute;
+      bottom: 0;
+      left: 0;
+      width: 100%;
+      height: 72px;
+      display: flex;
+      justify-content: center;
+      align-items: center;
+      gap: 14px;
+      background: linear-gradient(to top, rgba(0,0,0,0.75), transparent);
+      z-index: 10;
+    }
+
+    .control-btn {
+      width: 44px;
+      height: 44px;
+      border-radius: 50%;
+      background: rgba(255,255,255,0.1);
+      border: 1px solid rgba(255,255,255,0.15);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      cursor: default;
+    }
+
+    .control-btn.end {
+      background: #e53935;
+      border-color: #e53935;
+    }
+
+    .control-btn svg {
+      width: 20px;
+      height: 20px;
+      fill: #fff;
+    }
+
+    .loading {
+      position: absolute;
+      top: 50%;
+      left: 50%;
+      transform: translate(-50%, -50%);
+      color: #fff;
+      font-size: 18px;
+      z-index: 100;
+    }
+
+    .loading::after {
+      content: '...';
+      animation: dots 1.5s steps(4, end) infinite;
+    }
+
+    @keyframes dots {
+      0%, 20% { content: '.'; }
+      40% { content: '..'; }
+      60%, 100% { content: '...'; }
+    }
+
+    /* Responsive */
+    @media (max-width: 600px) {
+      #local {
+        width: 140px;
+        height: 100px;
+        bottom: 80px;
+        right: 12px;
+      }
+    }
+  </style>
+</head>
+
+<body>
+  <div class="meeting-container">
+
+    <!-- Top bar -->
+    <div class="top-bar">
+      <div class="meeting-title">Secure Video Meeting</div>
+      <div class="user-badge" id="userBadge">Loading...</div>
+    </div>
+
+    <!-- Videos -->
+    <video id="remote" autoplay playsinline></video>
+    <video id="local" autoplay muted playsinline></video>
+    
+    <!-- Loading indicator -->
+    <div class="loading" id="loading">جاري الاتصال</div>
+
+    <!-- Bottom controls (UI only) -->
+    <div class="controls">
+      <div class="control-btn">
+        <!-- Mic -->
+        <svg viewBox="0 0 24 24">
+          <path d="M12 14a3 3 0 003-3V5a3 3 0 00-6 0v6a3 3 0 003 3z"/>
+        </svg>
+      </div>
+
+      <div class="control-btn">
+        <!-- Camera -->
+        <svg viewBox="0 0 24 24">
+          <path d="M17 10.5V7a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2h10a2 2 0 002-2v-3.5l4 4v-11l-4 4z"/>
+        </svg>
+      </div>
+
+      <div class="control-btn end">
+        <!-- End call -->
+        <svg viewBox="0 0 24 24">
+          <path d="M3 10l3-3a15 15 0 0112 0l3 3-3 3-3-3a9 9 0 00-6 0l-3 3-3-3z"/>
+        </svg>
+      </div>
+    </div>
+  </div>
+
+  <!-- ❗ JS LOGIC -->
+  <script src="https://cdn.socket.io/4.7.2/socket.io.min.js"></script>
+  <script>
+  // جلب البيانات من localStorage
+  const token = localStorage.getItem('jwt_token');
+  const bookingId = localStorage.getItem('booking_id');
+
+  if (!token || !bookingId) {
+    alert('يرجى تسجيل الدخول أولاً');
+    window.location.href = 'index.html';
+  }
+
+  // Auto-detect API URL based on environment
+  const API_URL = window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1'
+    ? 'http://localhost:5000'
+    : 'https://infipeak-api.onrender.com';
+  
+  const socket = io(API_URL, {
+    auth: { token: token }
+  });
+
+  (async () => {
+    const localVideo = document.getElementById('local');
+    const remoteVideo = document.getElementById('remote');
+
+    let pc;
+    let isInitiator = false;
+    let isReady = false;
+
+    let stream = null;
+    
+    try {
+      // محاولة 1: كاميرا + ميكروفون بجودة عالية
+      try {
+        stream = await navigator.mediaDevices.getUserMedia({
+          video: {
+            width: { ideal: 1280 },
+            height: { ideal: 720 },
+            facingMode: 'user'
+          },
+          audio: {
+            echoCancellation: true,
+            noiseSuppression: true
+          }
+        });
+        console.log('Successfully got video + audio');
+      } catch (error1) {
+        console.warn('Failed to get video+audio, trying video only:', error1);
+        
+        // محاولة 2: كاميرا فقط
+        try {
+          stream = await navigator.mediaDevices.getUserMedia({ video: true });
+          console.log('Successfully got video only');
+        } catch (error2) {
+          console.warn('Failed to get video, trying audio only:', error2);
+          
+          // محاولة 3: ميكروفون فقط
+          try {
+            stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+            console.log('Successfully got audio only');
+            // إخفاء الفيديو المحلي إذا لم يكن هناك كاميرا
+            localVideo.style.display = 'none';
+          } catch (error3) {
+            console.warn('Failed to get audio, trying basic video:', error3);
+            
+            // محاولة 4: كاميرا بسيطة
+            try {
+              stream = await navigator.mediaDevices.getUserMedia({ 
+                video: { facingMode: 'user' } 
+              });
+              console.log('Successfully got basic video');
+            } catch (error4) {
+              // كل المحاولات فشلت
+              const errorMsg = getErrorMessage(error4);
+              throw new Error(errorMsg);
+            }
+          }
+        }
+      }
+      
+      if (stream) {
+        localVideo.srcObject = stream;
+        
+        // إذا لم يكن هناك video track، أخفي الفيديو المحلي
+        const videoTracks = stream.getVideoTracks();
+        if (videoTracks.length === 0) {
+          localVideo.style.display = 'none';
+          console.log('No video track, hiding local video');
+        }
+      } else {
+        throw new Error('فشل الوصول إلى الكاميرا/الميكروفون');
+      }
+
+      pc = new RTCPeerConnection({
+        iceServers: [{ urls: 'stun:stun.l.google.com:19302' }]
+      });
+
+      // إضافة tracks فقط إذا كانت موجودة
+      if (stream) {
+        stream.getTracks().forEach(track => {
+          pc.addTrack(track, stream);
+          console.log('Added track:', track.kind, track.enabled);
+        });
+      }
+
+      pc.ontrack = (e) => {
+        console.log('Received remote track');
+        remoteVideo.srcObject = e.streams[0];
+        document.getElementById('loading').style.display = 'none';
+      };
+
+      pc.onicecandidate = (e) => {
+        if (e.candidate && isReady) {
+          socket.emit('signal', {
+            bookingId,
+            signal: JSON.stringify({ ice: e.candidate })
+          });
+        }
+      };
+
+      pc.onconnectionstatechange = () => {
+        console.log('Connection state:', pc.connectionState);
+      };
+
+      socket.on('joined', async (data) => {
+        console.log('Joined room successfully', data);
+        isReady = true;
+        isInitiator = data.isFirst;
+        
+        if (data.isFirst) {
+          // إذا كنا الأول، ننتظر حتى ينضم شخص آخر
+          console.log('Waiting for peer to join...');
+        } else {
+          // إذا كنا الثاني، نرسل offer مباشرة
+          console.log('Second person joined, creating offer...');
+          setTimeout(async () => {
+            try {
+              const offer = await pc.createOffer();
+              await pc.setLocalDescription(offer);
+              console.log('Sending offer');
+              socket.emit('signal', {
+                bookingId,
+                signal: JSON.stringify({ sdp: offer })
+              });
+            } catch (error) {
+              console.error('Error creating offer:', error);
+            }
+          }, 500);
+        }
+      });
+
+      socket.on('peer-joined', async () => {
+        // عندما ينضم شخص آخر، الأول يرسل offer
+        if (isInitiator && isReady) {
+          console.log('Peer joined, creating offer...');
+          setTimeout(async () => {
+            try {
+              const offer = await pc.createOffer();
+              await pc.setLocalDescription(offer);
+              console.log('Sending offer');
+              socket.emit('signal', {
+                bookingId,
+                signal: JSON.stringify({ sdp: offer })
+              });
+            } catch (error) {
+              console.error('Error creating offer:', error);
+            }
+          }, 500);
+        }
+      });
+
+      socket.on('room-full', () => {
+        alert('الغرفة ممتلئة (شخصان فقط)');
+      });
+
+      socket.on('signal', async (data) => {
+        try {
+          const msg = JSON.parse(data);
+          
+          if (msg.sdp) {
+            console.log('Received SDP:', msg.sdp.type);
+            
+            if (msg.sdp.type === 'offer') {
+              // إذا استقبلنا offer، نكون answer
+              await pc.setRemoteDescription(new RTCSessionDescription(msg.sdp));
+              const answer = await pc.createAnswer();
+              await pc.setLocalDescription(answer);
+              console.log('Sending answer');
+              socket.emit('signal', {
+                bookingId,
+                signal: JSON.stringify({ sdp: answer })
+              });
+            } else if (msg.sdp.type === 'answer') {
+              // إذا استقبلنا answer، نضيفه
+              await pc.setRemoteDescription(new RTCSessionDescription(msg.sdp));
+            }
+          }
+          
+          if (msg.ice) {
+            try {
+              await pc.addIceCandidate(new RTCIceCandidate(msg.ice));
+            } catch (error) {
+              console.error('Error adding ICE candidate:', error);
+            }
+          }
+        } catch (error) {
+          console.error('Error handling signal:', error);
+        }
+      });
+
+      // الانضمام للغرفة
+      socket.emit('join-room', { bookingId });
+      
+    } catch (error) {
+      console.error('Error accessing media devices:', error);
+      const loadingEl = document.getElementById('loading');
+      loadingEl.textContent = 'خطأ: ' + error.message;
+      loadingEl.style.color = '#ff4444';
+      
+      // عرض رسالة خطأ مفصلة
+      const errorDetails = getErrorMessage(error);
+      const userMessage = errorDetails + '\n\n' +
+        'الحلول المقترحة:\n' +
+        '1. تأكد من أن الكاميرا/الميكروفون غير مستخدمة من تطبيق آخر\n' +
+        '2. أعد تحميل الصفحة وحاول مرة أخرى\n' +
+        '3. تأكد من السماح بالوصول إلى الكاميرا/الميكروفون في إعدادات المتصفح\n' +
+        '4. جرب متصفح آخر';
+      
+      if (confirm(userMessage + '\n\nهل تريد المتابعة بدون كاميرا؟')) {
+        // المتابعة بدون كاميرا (audio only أو بدون أي شيء)
+        localVideo.style.display = 'none';
+        document.getElementById('loading').textContent = 'جاري الاتصال بدون كاميرا...';
+        // المتابعة مع الاتصال
+      } else {
+        window.location.href = 'index.html';
+      }
+    }
+
+    // دالة للحصول على رسالة خطأ واضحة
+    function getErrorMessage(error) {
+      if (error.name === 'NotReadableError') {
+        return 'الكاميرا/الميكروفون مستخدمة من تطبيق آخر. أغلقه وحاول مرة أخرى.';
+      } else if (error.name === 'NotAllowedError') {
+        return 'تم رفض الوصول إلى الكاميرا/الميكروفون. يرجى السماح بالوصول في إعدادات المتصفح.';
+      } else if (error.name === 'NotFoundError') {
+        return 'لم يتم العثور على كاميرا/ميكروفون. تأكد من توصيل الجهاز.';
+      } else if (error.name === 'OverconstrainedError') {
+        return 'الكاميرا لا تدعم الإعدادات المطلوبة.';
+      } else {
+        return error.message || 'حدث خطأ غير معروف أثناء الوصول إلى الكاميرا/الميكروفون.';
+      }
+    }
+
+    // عرض معلومات المستخدم
+    try {
+      const response = await fetch(`${API_URL}/bookings/me`, {
+        headers: {
+          'Authorization': `Bearer ${token}`
+        }
+      });
+      if (response.ok) {
+        const bookings = await response.json();
+        const booking = bookings.find(b => b.id === bookingId);
+        if (booking) {
+          document.getElementById('userBadge').textContent = 
+            `Booking: ${bookingId.substring(0, 8)}... | Status: ${booking.status}`;
+        }
+      }
+    } catch (e) {
+      console.error('Failed to load booking info:', e);
+    }
+  })();
+  </script>
+</body>
+</html>

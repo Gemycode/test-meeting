@@ -1,0 +1,411 @@
+<!DOCTYPE html>
+<html lang="ar" dir="rtl">
+<head>
+  <meta charset="UTF-8" />
+  <title>تسجيل الدخول - InfiPeak</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <style>
+    * {
+      margin: 0;
+      padding: 0;
+      box-sizing: border-box;
+    }
+
+    body {
+      font-family: "Segoe UI", system-ui, -apple-system, BlinkMacSystemFont, sans-serif;
+      background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+      min-height: 100vh;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      padding: 20px;
+    }
+
+    .login-container {
+      background: white;
+      border-radius: 16px;
+      box-shadow: 0 20px 60px rgba(0,0,0,0.3);
+      width: 100%;
+      max-width: 400px;
+      padding: 40px;
+    }
+
+    h1 {
+      color: #333;
+      margin-bottom: 10px;
+      font-size: 28px;
+      text-align: center;
+    }
+
+    .subtitle {
+      color: #666;
+      text-align: center;
+      margin-bottom: 30px;
+      font-size: 14px;
+    }
+
+    .form-group {
+      margin-bottom: 20px;
+    }
+
+    label {
+      display: block;
+      color: #333;
+      margin-bottom: 8px;
+      font-size: 14px;
+      font-weight: 500;
+    }
+
+    input {
+      width: 100%;
+      padding: 12px 16px;
+      border: 2px solid #e0e0e0;
+      border-radius: 8px;
+      font-size: 16px;
+      transition: border-color 0.3s;
+    }
+
+    input:focus {
+      outline: none;
+      border-color: #667eea;
+    }
+
+    .btn {
+      width: 100%;
+      padding: 14px;
+      background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+      color: white;
+      border: none;
+      border-radius: 8px;
+      font-size: 16px;
+      font-weight: 600;
+      cursor: pointer;
+      transition: transform 0.2s, box-shadow 0.2s;
+    }
+
+    .btn:hover {
+      transform: translateY(-2px);
+      box-shadow: 0 10px 20px rgba(102, 126, 234, 0.4);
+    }
+
+    .btn:active {
+      transform: translateY(0);
+    }
+
+    .btn:disabled {
+      opacity: 0.6;
+      cursor: not-allowed;
+      transform: none;
+    }
+
+    .error {
+      background: #fee;
+      color: #c33;
+      padding: 12px;
+      border-radius: 8px;
+      margin-bottom: 20px;
+      font-size: 14px;
+      display: none;
+    }
+
+    .error.show {
+      display: block;
+    }
+
+    .info {
+      background: #e3f2fd;
+      color: #1976d2;
+      padding: 12px;
+      border-radius: 8px;
+      margin-top: 20px;
+      font-size: 13px;
+      text-align: center;
+    }
+
+    .user-info {
+      margin-top: 20px;
+      padding: 15px;
+      background: #f5f5f5;
+      border-radius: 8px;
+      font-size: 13px;
+    }
+
+    .user-info strong {
+      color: #333;
+    }
+
+    .bookings-list {
+      margin-top: 20px;
+      max-height: 200px;
+      overflow-y: auto;
+    }
+
+    .booking-item {
+      padding: 12px;
+      background: white;
+      border: 1px solid #e0e0e0;
+      border-radius: 8px;
+      margin-bottom: 10px;
+      cursor: pointer;
+      transition: all 0.2s;
+    }
+
+    .booking-item:hover {
+      border-color: #667eea;
+      background: #f8f9ff;
+    }
+
+    .booking-item.selected {
+      border-color: #667eea;
+      background: #f0f4ff;
+    }
+
+    .booking-status {
+      display: inline-block;
+      padding: 4px 8px;
+      border-radius: 4px;
+      font-size: 11px;
+      font-weight: 600;
+      margin-left: 8px;
+    }
+
+    .status-CONFIRMED {
+      background: #4caf50;
+      color: white;
+    }
+
+    .status-PENDING {
+      background: #ff9800;
+      color: white;
+    }
+
+    .status-COMPLETED {
+      background: #2196f3;
+      color: white;
+    }
+  </style>
+</head>
+<body>
+  <div class="login-container">
+    <h1>تسجيل الدخول</h1>
+    <p class="subtitle">Infipeak Video Meeting</p>
+
+    <div class="error" id="error"></div>
+
+    <form id="loginForm">
+      <div class="form-group">
+        <label for="email">البريد الإلكتروني</label>
+        <input type="email" id="email" required placeholder="example@email.com" />
+      </div>
+
+      <div class="form-group">
+        <label for="password">كلمة المرور</label>
+        <input type="password" id="password" required placeholder="••••••••" />
+      </div>
+
+      <button type="submit" class="btn" id="loginBtn">تسجيل الدخول</button>
+    </form>
+
+    <div id="userInfo" style="display: none;">
+      <div class="user-info">
+        <div><strong>المستخدم:</strong> <span id="userName"></span></div>
+        <div><strong>البريد:</strong> <span id="userEmail"></span></div>
+        <div><strong>الرول:</strong> <span id="userRole"></span></div>
+        <div><strong>User ID:</strong> <span id="userId"></span></div>
+      </div>
+
+      <div id="servicesSection" style="display: none; margin-top: 20px;">
+        <h3 style="font-size: 16px; margin-bottom: 10px; color: #333;">الخدمات</h3>
+        <div class="bookings-list" id="servicesList"></div>
+      </div>
+
+      <div style="margin-top: 20px;">
+        <h3 style="font-size: 16px; margin-bottom: 10px; color: #333;">الحجوزات</h3>
+        <div class="bookings-list" id="bookingsList"></div>
+      </div>
+
+      <button class="btn" id="joinMeetingBtn" style="display: none; margin-top: 15px;">
+        دخول الميتنج
+      </button>
+    </div>
+  </div>
+
+  <script>
+    // Auto-detect API URL based on environment
+    const API_URL = window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1'
+      ? 'http://localhost:5000'
+      : 'https://infipeak-api.onrender.com';
+    
+    let token = '';
+    let selectedBookingId = '';
+    let userRole = '';
+
+    document.getElementById('loginForm').addEventListener('submit', async (e) => {
+      e.preventDefault();
+      const errorDiv = document.getElementById('error');
+      const loginBtn = document.getElementById('loginBtn');
+      
+      errorDiv.classList.remove('show');
+      loginBtn.disabled = true;
+      loginBtn.textContent = 'جاري تسجيل الدخول...';
+
+      try {
+        const email = document.getElementById('email').value;
+        const password = document.getElementById('password').value;
+
+        const response = await fetch(`${API_URL}/auth/login`, {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify({ email, password }),
+        });
+
+        if (!response.ok) {
+          const error = await response.json();
+          throw new Error(error.message || 'فشل تسجيل الدخول');
+        }
+
+        const data = await response.json();
+        token = data.accessToken;
+        userRole = data.role;
+
+        // عرض معلومات المستخدم
+        document.getElementById('userName').textContent = data.email;
+        document.getElementById('userEmail').textContent = data.email;
+        document.getElementById('userRole').textContent = data.role;
+        document.getElementById('userId').textContent = data.userId;
+        document.getElementById('userInfo').style.display = 'block';
+        document.getElementById('loginForm').style.display = 'none';
+
+        // جلب الحجوزات والخدمات
+        await loadBookings();
+        if (userRole === 'COMPANY') {
+          await loadServices();
+        }
+      } catch (error) {
+        errorDiv.textContent = error.message || 'حدث خطأ أثناء تسجيل الدخول';
+        errorDiv.classList.add('show');
+        loginBtn.disabled = false;
+        loginBtn.textContent = 'تسجيل الدخول';
+      }
+    });
+
+    async function loadBookings() {
+      try {
+        // استخدام endpoint مختلف بناءً على الـ role
+        const endpoint = userRole === 'COMPANY' ? '/bookings/company' : '/bookings/me';
+        
+        const response = await fetch(`${API_URL}${endpoint}`, {
+          headers: {
+            'Authorization': `Bearer ${token}`,
+          },
+        });
+
+        if (!response.ok) throw new Error('فشل جلب الحجوزات');
+
+        const bookings = await response.json();
+        const bookingsList = document.getElementById('bookingsList');
+
+        if (bookings.length === 0) {
+          bookingsList.innerHTML = '<div class="info">لا توجد حجوزات متاحة</div>';
+          return;
+        }
+
+        bookingsList.innerHTML = bookings.map(booking => `
+          <div class="booking-item" data-booking-id="${booking.id}" data-status="${booking.status}">
+            <div>
+              <strong>${booking.id}</strong>
+              <span class="booking-status status-${booking.status}">${booking.status}</span>
+            </div>
+            <div style="font-size: 11px; color: #666; margin-top: 4px;">
+              ${new Date(booking.startDateTime).toLocaleString('ar-EG')}
+            </div>
+          </div>
+        `).join('');
+
+        // إضافة event listeners
+        document.querySelectorAll('.booking-item').forEach(item => {
+          item.addEventListener('click', () => {
+            document.querySelectorAll('.booking-item').forEach(i => i.classList.remove('selected'));
+            item.classList.add('selected');
+            selectedBookingId = item.dataset.bookingId;
+            const status = item.dataset.status;
+            
+            if (status === 'CONFIRMED' || status === 'COMPLETED') {
+              document.getElementById('joinMeetingBtn').style.display = 'block';
+            } else {
+              document.getElementById('joinMeetingBtn').style.display = 'none';
+              alert('الحجز يجب أن يكون CONFIRMED أو COMPLETED لدخول الميتنج');
+            }
+          });
+        });
+
+        // اختيار أول حجز CONFIRMED تلقائياً
+        const confirmedBooking = bookings.find(b => b.status === 'CONFIRMED' || b.status === 'COMPLETED');
+        if (confirmedBooking) {
+          const item = document.querySelector(`[data-booking-id="${confirmedBooking.id}"]`);
+          if (item) {
+            item.click();
+          }
+        }
+      } catch (error) {
+        document.getElementById('bookingsList').innerHTML = 
+          `<div class="error show">${error.message}</div>`;
+      }
+    }
+
+    async function loadServices() {
+      try {
+        const response = await fetch(`${API_URL}/services/me`, {
+          headers: {
+            'Authorization': `Bearer ${token}`,
+          },
+        });
+
+        if (!response.ok) throw new Error('فشل جلب الخدمات');
+
+        const services = await response.json();
+        const servicesList = document.getElementById('servicesList');
+        const servicesSection = document.getElementById('servicesSection');
+
+        if (services.length === 0) {
+          servicesList.innerHTML = '<div class="info">لا توجد خدمات متاحة</div>';
+          servicesSection.style.display = 'block';
+          return;
+        }
+
+        servicesList.innerHTML = services.map(service => `
+          <div class="booking-item" style="cursor: default;">
+            <div>
+              <strong>${service.title}</strong>
+              <span class="booking-status" style="background: #2196f3; color: white;">${service.pricingType}</span>
+            </div>
+            <div style="font-size: 11px; color: #666; margin-top: 4px;">
+              السعر: ${service.price} | المدة: ${service.durationMin} دقيقة
+            </div>
+          </div>
+        `).join('');
+
+        servicesSection.style.display = 'block';
+      } catch (error) {
+        console.error('Failed to load services:', error);
+      }
+    }
+
+    document.getElementById('joinMeetingBtn').addEventListener('click', () => {
+      if (!selectedBookingId) {
+        alert('يرجى اختيار حجز أولاً');
+        return;
+      }
+
+      // حفظ البيانات في localStorage
+      localStorage.setItem('jwt_token', token);
+      localStorage.setItem('booking_id', selectedBookingId);
+
+      // الانتقال إلى صفحة الميتنج
+      window.location.href = 'test.html';
+    });
+  </script>
+</body>
+</html>
